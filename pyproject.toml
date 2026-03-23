@@ -25,4 +25,5 @@ dev = [
     "uvicorn>=0.34",
     "python-multipart>=0.0.20",
     "pyyaml>=6.0",
+    "mitmproxy>=11.0",
 ]
