@@ -77,13 +77,17 @@ class AegisAddon:
 
     def _is_rate_limited(self, client_ip: str) -> bool:
         now = time.monotonic()
-        if client_ip not in self._request_log:
-            self._request_log[client_ip] = collections.deque()
-        timestamps = self._request_log[client_ip]
-        # Remove entries outside the window
+        timestamps = self._request_log.get(client_ip)
+        if timestamps is None:
+            self._request_log[client_ip] = collections.deque([now])
+            return False
         cutoff = now - RATE_LIMIT_WINDOW
         while timestamps and timestamps[0] < cutoff:
             timestamps.popleft()
+        if not timestamps:
+            del self._request_log[client_ip]
+            self._request_log[client_ip] = collections.deque([now])
+            return False
         if len(timestamps) >= RATE_LIMIT_REQUESTS:
             return True
         timestamps.append(now)
@@ -114,7 +118,10 @@ class AegisAddon:
 
         request_id = flow.metadata.get("aegis_request_id", generate_request_id())
 
-        # Response size limit — block oversized responses before further processing
+        content_length = flow.response.headers.get("content-length")
+        if content_length and int(content_length) > MAX_RESPONSE_SIZE:
+            block_flow(flow, "response_too_large", request_id)
+            return
         if flow.response.content and len(flow.response.content) > MAX_RESPONSE_SIZE:
             block_flow(flow, "response_too_large", request_id)
             return
