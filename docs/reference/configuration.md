@@ -4,6 +4,21 @@
 
 ## Environment Variables
 
+### Aegis Gate (Host)
+
+| Variable | Default | Description |
+|---|---|---|
+| `AEGIS_COMPOSE_FILE` | `./docker-compose.yml` | docker-compose.yml のパス |
+| `AEGIS_COMPOSE_PROJECT` | `aegis` | Docker Compose プロジェクト名 |
+| `AEGIS_OUTPUT_FORMAT` | `text` | CLI 出力形式 (`text`, `json`) |
+| `AEGIS_TIMEOUT` | `30` | リクエストタイムアウト (秒) |
+
+### Docker Compose (Host)
+
+| Variable | Default | Description |
+|---|---|---|
+| `AEGIS_WORKSPACE` | `./workspace` | Worker にマウントするホスト側ディレクトリ |
+
 ### aegis-worker
 
 | Variable | Default | Description |

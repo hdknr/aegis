@@ -18,6 +18,7 @@ services:
       - aegis-net
     volumes:
       - clamav-db:/var/lib/clamav
+      - trivy-db:/root/.cache/trivy
     environment:
       AEGIS_SCAN_TIMEOUT: "30000"
       AEGIS_MAX_FILE_SIZE: "52428800"
@@ -81,7 +82,7 @@ services:
     networks:
       - aegis-net
     volumes:
-      - ./workspace:/workspace
+      - ${AEGIS_WORKSPACE:-./workspace}:/workspace
       - aegis-certs:/certs:ro
     environment:
       HTTP_PROXY: "http://aegis-proxy:8080"
@@ -118,6 +119,8 @@ networks:
 # ============================================================
 volumes:
   clamav-db:
+    driver: local
+  trivy-db:
     driver: local
   aegis-certs:
     driver: local
@@ -164,9 +167,26 @@ graph LR
 | Volume | Mount Point | Purpose |
 |---|---|---|
 | `clamav-db` | `/var/lib/clamav` (scanner) | ClamAV 定義ファイルの永続化 |
+| `trivy-db` | `/root/.cache/trivy` (scanner) | Trivy 脆弱性 DB の永続化 |
 | `aegis-certs` | `/home/mitmproxy/.mitmproxy` (proxy), `/certs` (worker) | mitmproxy CA 証明書の共有 |
-| `./workspace` | `/workspace` (worker) | プロジェクトディレクトリのマウント |
+| `${AEGIS_WORKSPACE:-./workspace}` | `/workspace` (worker) | プロジェクトディレクトリのマウント（環境変数で変更可能） |
 | `./rules` | `/opt/aegis/rules` (proxy) | スキャンルール設定ファイル |
+
+## Workspace Configuration
+
+Worker コンテナの `/workspace` にマウントされるホスト側ディレクトリは `AEGIS_WORKSPACE` 環境変数で変更できる。
+
+```bash
+# デフォルト: ./workspace ディレクトリ
+docker compose up -d
+
+# 任意のプロジェクトディレクトリを指定
+AEGIS_WORKSPACE=~/Projects/my-app docker compose up -d
+
+# .env ファイルで永続的に設定
+echo "AEGIS_WORKSPACE=~/Projects/my-app" >> .env
+docker compose up -d
+```
 
 ## Operations
 

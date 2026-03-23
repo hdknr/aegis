@@ -115,19 +115,61 @@ Content-Type: multipart/form-data
   "status": "healthy",
   "clamav": "ready",
   "trivy": "ready",
-  "clamav_db_age_hours": 2
+  "clamav_db_age_hours": 2,
+  "trivy_db_age_hours": 18
 }
 ```
 
-## ClamAV Database Update
+## Definition Updates
 
-- **初回起動時**: `freshclam` で最新の定義ファイルをダウンロード
-- **定期更新**: 6 時間ごとに `freshclam` を実行
-- **データベース永続化**: Docker volume に定義ファイルを保存
+### ClamAV Database
+
+| タイミング | 方法 | 備考 |
+|---|---|---|
+| 初回起動 | `freshclam` で最新 DB をダウンロード | entrypoint.sh 内で実行 |
+| 定期更新 | `freshclam` を 6 時間ごとに実行 | cron or バックグラウンドプロセス |
+| 手動更新 | `aegis update` (Gate CLI 経由) | 即時反映 |
+
+- `clamd` デーモンは DB ファイルの変更を検知し、**再起動なしで自動リロード**する
+- DB は Docker volume (`clamav-db`) に永続化され、コンテナ再起動時にもダウンロード不要
 
 ```yaml
 volumes:
   - clamav-db:/var/lib/clamav
+```
+
+### Trivy Database
+
+| タイミング | 方法 | 備考 |
+|---|---|---|
+| 初回起動 | entrypoint.sh で `trivy --download-db-only` を実行 | 初回は 1-2 分かかる |
+| 定期更新 | 日次で `trivy --download-db-only` を実行 | cron or バックグラウンドプロセス |
+| 手動更新 | `aegis update` (Gate CLI 経由) | 即時反映 |
+| スキャン時 | `--skip-db-update` を使用 | 定期更新に任せ、スキャン時のオーバーヘッドを回避 |
+
+- Trivy DB は `/root/.cache/trivy/db` に保存
+- Docker volume で永続化し、コンテナ再起動時の再ダウンロードを防止
+
+```yaml
+volumes:
+  - trivy-db:/root/.cache/trivy
+```
+
+### Update API
+
+Scanner に DB 更新をトリガーする API エンドポイントを提供する。Gate CLI の `aegis update` から呼び出される。
+
+**POST /update**
+
+```json
+// Request
+{"targets": ["clamav", "trivy"]}  // 省略時は全て更新
+
+// Response (200 OK)
+{
+  "clamav": {"status": "updated", "previous_age_hours": 5, "duration_ms": 12000},
+  "trivy": {"status": "updated", "previous_age_hours": 22, "duration_ms": 45000}
+}
 ```
 
 ## Performance Configuration

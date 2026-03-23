@@ -104,6 +104,68 @@ volumes:
 }
 ```
 
+## Rule Updates
+
+### C2 Blocklist の自動更新
+
+C2 IP blocklist は脅威インテリジェンスフィードから日次で自動取得する。
+
+| タイミング | 方法 | 備考 |
+|---|---|---|
+| 初回起動 | `rules/c2_blocklist.txt` を読み込み | 静的ファイル |
+| 定期更新 | 日次で外部フィードから取得 | バックグラウンドプロセス |
+| 手動更新 | `aegis update` (Gate CLI 経由) | 即時反映 |
+
+**対応フィード:**
+
+| Source | URL | Format |
+|---|---|---|
+| abuse.ch Feodo Tracker | `https://feodotracker.abuse.ch/downloads/ipblocklist.txt` | IP list (1 行 1 IP) |
+| Emerging Threats | `https://rules.emergingthreats.net/blockrules/compromised-ips.txt` | IP list |
+
+更新処理:
+
+1. 外部フィードから IP リストをダウンロード
+2. ローカルの `c2_blocklist.txt` のカスタムエントリとマージ
+3. メモリ上のブロックリストを更新（**プロキシ再起動なしでホットリロード**）
+4. 更新結果をログに記録
+
+### Domain Whitelist / Rules の更新
+
+Domain whitelist と `rules.yml` はセキュリティポリシーに関わるため、**自動更新は行わず手動管理**とする。
+
+| 操作 | 方法 |
+|---|---|
+| ファイル編集 | `rules/domain_whitelist.txt`, `rules/rules.yml` を直接編集 |
+| 反映 | `aegis reload` (Gate CLI) でホットリロード、または `docker compose restart aegis-proxy` |
+
+### Hot Reload
+
+Proxy は以下のシグナルまたは API でルールファイルをホットリロードする:
+
+- **SIGHUP**: `kill -HUP <pid>` でルール再読み込み
+- **Gate CLI**: `aegis reload` コマンドが内部で SIGHUP を送信
+
+```bash
+# Gate CLI でホットリロード
+aegis reload
+
+# 手動でホットリロード
+docker compose exec aegis-proxy kill -HUP 1
+```
+
+ホットリロード時のログ:
+
+```json
+{
+  "timestamp": "2026-03-23T12:00:00Z",
+  "action": "rules_reloaded",
+  "domain_whitelist_count": 12,
+  "c2_blocklist_count": 1543,
+  "dangerous_patterns_count": 7
+}
+```
+
 ## Failure Mode
 
 **Fail-closed**: `aegis-scanner` への接続失敗時やタイムアウト時は、該当リクエストを**ブロック**する。安全側に倒すことで、スキャナー障害時にマルウェアが通過することを防ぐ。
