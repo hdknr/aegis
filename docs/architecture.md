@@ -146,6 +146,51 @@ sequenceDiagram
 - **Proxy**: `aegis-net` + 外部ネットワークに接続。ゲートウェイとして機能
 - **Scanner**: `aegis-net` のみに接続。外部アクセス不要（定義ファイル更新時のみ例外）
 
+## Performance
+
+### Request Path の各ステップ
+
+MCP Server 経由でスキャンを実行した場合の、各ステップの想定レイテンシ。
+
+| Step | 処理内容 | 想定時間 | 備考 |
+|---|---|---|---|
+| MCP stdio 通信 | JSON-RPC 往復 | ~5ms | ローカルプロセス間 |
+| `docker compose exec` | コンテナ attach + コマンド開始 | 200-500ms | Docker API 経由 |
+| Proxy request() hook | ドメイン/IP チェック | ~1-5ms | メモリ上の set/list 検索 |
+| 外部 HTTP リクエスト | ネットワーク往復 | 100-3000ms | 対象サーバー・回線依存 |
+| mitmproxy TLS 処理 | TLS インターセプト | ~10-30ms | 証明書生成はキャッシュ後は高速 |
+| Proxy response() hook | Content-Type + パターンマッチ | ~1-10ms | regex マッチング |
+| Scanner: ClamAV | シグネチャマッチング | 200-2000ms | ファイルサイズ依存。1MB で約 500ms |
+| Scanner: Trivy | 脆弱性 DB 検索 | 500-5000ms | バイナリは重い。スクリプトは軽い |
+
+### シナリオ別レイテンシ
+
+| シナリオ | 例 | Scanner 呼出 | 想定合計時間 |
+|---|---|---|---|
+| HTML ページ取得 | 通常の Web ページ | なし | **~1 秒** |
+| スクリプト取得 (パターンマッチ) | `.sh` ファイル | なし (Proxy 内で完結) | **~1 秒** |
+| バイナリ取得 (フルスキャン) | `.tar.gz`, 実行ファイル | ClamAV + Trivy | **3-8 秒** |
+| 大容量バイナリ (10MB 超) | 大きなパッケージ | ClamAV + Trivy | **10 秒以上** |
+| ブロック (request() で即拒否) | C2 IP, 非許可ドメイン | なし | **~300ms** |
+
+### ボトルネック
+
+| 順位 | ボトルネック | 影響 | 緩和策 |
+|---|---|---|---|
+| 1 | `docker compose exec` | 毎回 200-500ms の固定コスト | 将来: Worker 内常駐 API |
+| 2 | Trivy scan | バイナリで 1-5 秒 | DB キャッシュ、タイムアウト設定 |
+| 3 | 外部リクエスト | ネットワーク依存 | 制御不能 |
+| 4 | ClamAV scan | ファイルサイズ依存 | clamd デーモンで DB をメモリ常駐 |
+
+### 将来の最適化方針
+
+MVP では `docker compose exec` 経由でコマンドを実行するが、以下の最適化で `docker compose exec` のオーバーヘッド (200-500ms) を削減可能:
+
+- **Worker 内 HTTP API**: Worker 内に軽量な HTTP API サーバーを常駐させ、Gate から直接 HTTP で呼び出す
+- **常駐プロセス + Socket 通信**: Worker 内に常駐プロセスを置き、Unix socket / TCP で Gate と通信
+
+Claude Code の応答全体が数秒〜数十秒かかることを考慮すると、MVP のレイテンシ（スキャンなし ~1 秒、フルスキャン ~3-8 秒）は十分実用的である。
+
 ## Service Dependencies
 
 ```mermaid
