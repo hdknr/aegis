@@ -186,6 +186,54 @@ $ aegis fetch --json https://example.com/page.html
 - ダウンロードしたファイルの安全性確認 → `aegis_scan` を使用
 - 環境の稼働確認 → `aegis_status` を使用
 
+### Verdict に基づく振る舞い制御
+
+MCP ツールのスキャン結果（verdict）に応じて、Claude Code がユーザーへの確認を自動的に判断する。この振る舞いは MCP ツールの description と CLAUDE.md の 2 層で制御する。
+
+#### MCP ツール description による制御
+
+各ツールの description にデフォルトの振る舞いルールを記述する。Claude Code はツール呼び出し時にこの description を参照する:
+
+```python
+@server.tool()
+async def aegis_fetch(url: str) -> dict:
+    """Fetch a URL through Aegis security scanning pipeline.
+
+    IMPORTANT behavior rules based on verdict:
+    - verdict "allow": Safe content. Proceed without asking the user.
+    - verdict "warn": Potential risk detected. Show the warning details
+      to the user and ask for confirmation (Y/N) before using the content.
+    - verdict "block": Threat detected. Show the block reason and scan
+      details to the user and ask for confirmation (Y/N) before proceeding.
+      Do NOT use blocked content unless the user explicitly approves.
+    """
+    ...
+```
+
+#### CLAUDE.md による制御
+
+プロジェクトの `CLAUDE.md` に記述することで、プロジェクト固有のカスタマイズや上書きが可能:
+
+```markdown
+## Aegis Security Policy
+
+Aegis MCP ツール (aegis_fetch, aegis_scan) の結果に基づき、以下のように動作すること:
+
+- **verdict: allow** → ユーザーへの確認なしで次の処理に進む
+- **verdict: warn** → 警告内容をユーザーに表示し、続行の同意 (Y/N) を求める
+- **verdict: block** → ブロック理由と詳細をユーザーに表示し、続行の同意 (Y/N) を求める。
+  ユーザーが拒否した場合は代替手段を提案する
+```
+
+#### 制御レイヤーの使い分け
+
+| 方式 | 適用範囲 | 用途 |
+|---|---|---|
+| MCP tool description | Aegis を使う全プロジェクト | デフォルトの振る舞い定義 |
+| CLAUDE.md | プロジェクト単位 | プロジェクト固有のポリシー調整 |
+
+両方を併用することで、ツールレベルのデフォルト動作をプロジェクトごとにカスタマイズできる。例えば、セキュリティ要件が厳しいプロジェクトでは `warn` でも即ブロックするよう CLAUDE.md で上書きできる。
+
 ### 利用シナリオ例
 
 **Twitter/X のリンク先を安全に確認:**
@@ -196,8 +244,8 @@ $ aegis fetch --json https://example.com/page.html
 Claude Code:
 1. WebFetch で tweet ページを読み取り、リンク URL を抽出
 2. aegis_fetch(url) で各リンク先を安全に取得
-3. verdict が "block" のリンクについて警告
-4. verdict が "allow" のコンテンツを要約して回答
+3. verdict: allow → そのまま内容を要約
+4. verdict: block → "このリンクは危険と判定されました: [理由]。開きますか？ (Y/N)"
 ```
 
 **npm パッケージの安全性確認:**
@@ -207,8 +255,9 @@ Claude Code:
 
 Claude Code:
 1. aegis_fetch でパッケージの tarball URL を取得
-2. ClamAV + Trivy によるスキャン結果を確認
-3. 安全であればインストール手順を提示
+2. verdict: allow → "スキャン通過。インストールします"
+3. verdict: warn → "中リスクの脆弱性が検出されました: CVE-XXXX。インストールしますか？ (Y/N)"
+4. verdict: block → "マルウェアが検出されました。インストールを中止します"
 ```
 
 ## Implementation Notes
