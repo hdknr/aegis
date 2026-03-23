@@ -100,3 +100,12 @@ def reload():
     except subprocess.TimeoutExpired:
         click.echo("Error: reload timed out", err=True)
         sys.exit(1)
+
+
+@main.command("mcp-server")
+def mcp_server():
+    """Start Aegis MCP Server (stdio transport for Claude Code)."""
+    # Lazy import: mcp is a heavy dependency, only load when this command is used
+    import asyncio
+    from aegis.mcp_server import run
+    asyncio.run(run())
