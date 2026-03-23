@@ -1,0 +1,11 @@
+# Aegis C2 IP Blocklist
+# Known Command & Control server IP addresses/ranges.
+# CIDR notation. Lines starting with # are comments.
+#
+# Sources (update periodically):
+#   - https://feodotracker.abuse.ch/downloads/ipblocklist.txt
+#   - https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+#
+# Placeholder entries (RFC 5737 documentation ranges):
+198.51.100.0/24
+203.0.113.0/24

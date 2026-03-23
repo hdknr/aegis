@@ -1,0 +1,55 @@
+# Aegis Scan Rules
+# Defines dangerous patterns and content-type based rules for aegis-proxy.
+
+dangerous_patterns:
+  - name: curl_pipe_bash
+    pattern: 'curl\s+.*\|\s*(ba)?sh'
+    severity: critical
+    description: "Piping curl output directly to shell"
+
+  - name: wget_pipe_sh
+    pattern: 'wget\s+.*\|\s*(ba)?sh'
+    severity: critical
+    description: "Piping wget output directly to shell"
+
+  - name: base64_decode_exec
+    pattern: 'base64\s+(-d|--decode).*\|\s*(ba)?sh'
+    severity: critical
+    description: "Decoding base64 and executing in shell"
+
+  - name: eval_curl
+    pattern: 'eval\s+"\$\(curl'
+    severity: critical
+    description: "Eval with remote code download"
+
+  - name: download_and_exec
+    pattern: 'curl.*-o\s+/tmp/.*&&.*sh\s+/tmp/'
+    severity: high
+    description: "Download to temp and execute"
+
+  - name: python_urllib_exec
+    pattern: 'python[23]?\s+-c\s+.*urllib'
+    severity: medium
+    description: "Python one-liner with urllib"
+
+  - name: perl_reverse_shell
+    pattern: 'perl\s+-e\s+.*socket'
+    severity: high
+    description: "Perl reverse shell pattern"
+
+content_type_rules:
+  scan_required:
+    - "application/x-executable"
+    - "application/x-sharedlib"
+    - "application/x-mach-binary"
+    - "application/octet-stream"
+    - "application/gzip"
+    - "application/zip"
+    - "application/x-tar"
+  pattern_check:
+    - "text/x-shellscript"
+    - "text/x-python"
+  pass_through:
+    - "text/html"
+    - "text/plain"
+    - "application/json"

@@ -1,0 +1,19 @@
+# Aegis Domain Whitelist
+# Domains allowed for binary/executable downloads.
+# One domain per line. Lines starting with # are comments.
+
+# Source code & releases
+github.com
+objects.githubusercontent.com
+
+# Package registries
+registry.npmjs.org
+pypi.org
+files.pythonhosted.org
+rubygems.org
+
+# Official tool distributions
+dl.google.com
+deb.nodesource.com
+apt.llvm.org
+packages.microsoft.com

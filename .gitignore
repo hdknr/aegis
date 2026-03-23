@@ -15,5 +15,18 @@ uv.lock
 .vscode/
 *.swp
 
+# Workspace (keep .gitkeep only)
+workspace/*
+!workspace/.gitkeep
+
+# Docker volumes
+clamav-db/
+trivy-db/
+
+# Certificates
+*.pem
+*.crt
+!docs/**/*.crt
+
 # OS
 .DS_Store
