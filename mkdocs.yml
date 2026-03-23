@@ -50,6 +50,7 @@ nav:
   - Architecture: architecture.md
   - Getting Started: getting-started.md
   - Components:
+      - "Aegis Gate (MCP/CLI)": components/gate.md
       - "Aegis Shield (Worker)": components/worker.md
       - "Aegis Eye (Proxy)": components/proxy.md
       - "Aegis Blade (Scanner)": components/scanner.md
