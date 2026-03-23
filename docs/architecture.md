@@ -36,23 +36,39 @@ graph TB
 
 ## Request Lifecycle
 
-AI エージェントが外部リクエストを発行してからレスポンスを受け取るまでの全フロー。
+ユーザーはホスト PC のコンソールで Claude Code を操作する。外部リソースへのアクセスが必要な場合、2 つの利用パターンがある:
+
+- **パターン A**: ホストの Claude Code が aegis-worker にコマンドを委譲する（`docker compose exec` 経由）
+- **パターン B**: aegis-worker 内で直接 Claude Code を起動する（`claude --dangerously-skip-permissions`）
+
+いずれの場合も、aegis-worker からの外部通信は全て Aegis Eye (proxy) を経由する。
 
 ```mermaid
 sequenceDiagram
-    participant Agent as AI Agent<br/>(aegis-worker)
+    participant User as User<br/>(Host PC)
+    participant Claude as Claude Code<br/>(Host)
+    participant Worker as Aegis Shield<br/>(aegis-worker)
     participant Proxy as Aegis Eye<br/>(aegis-proxy)
     participant Scanner as Aegis Blade<br/>(aegis-scanner)
     participant Ext as External Server
 
-    Agent->>Proxy: HTTP(S) request via proxy
+    alt Pattern A: Host Claude Code delegates to Worker
+        User->>Claude: Operate via console
+        Claude->>Worker: docker compose exec<br/>(curl, npm install, etc.)
+    else Pattern B: Claude Code runs inside Worker
+        User->>Worker: docker compose exec bash
+        Note over Worker: claude --dangerously-skip-permissions
+        Worker->>Worker: Claude Code executes command
+    end
+
+    Worker->>Proxy: HTTP(S) request via HTTP_PROXY
 
     Note over Proxy: request() hook
     Proxy->>Proxy: Check domain whitelist
     Proxy->>Proxy: Check C2 IP blocklist
 
     alt Domain blocked or C2 IP detected
-        Proxy-->>Agent: 403 Forbidden + reason
+        Proxy-->>Worker: 403 Forbidden + reason
     else Request allowed
         Proxy->>Ext: Forward request
         Ext-->>Proxy: Response
@@ -67,12 +83,12 @@ sequenceDiagram
             Scanner-->>Proxy: verdict + details
 
             alt verdict = block
-                Proxy-->>Agent: 403 Forbidden + scan details
+                Proxy-->>Worker: 403 Forbidden + scan details
             else verdict = allow or warn
-                Proxy-->>Agent: Response (+ warning header if warn)
+                Proxy-->>Worker: Response (+ warning header if warn)
             end
         else Safe Content-Type
-            Proxy-->>Agent: Response (pass-through)
+            Proxy-->>Worker: Response (pass-through)
         end
     end
 ```
