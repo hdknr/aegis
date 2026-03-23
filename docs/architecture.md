@@ -144,7 +144,7 @@ sequenceDiagram
 - **aegis-net**: 全コンテナが接続する内部 Docker ブリッジネットワーク
 - **Worker**: `aegis-net` のみに接続。直接の外部アクセスなし
 - **Proxy**: `aegis-net` + 外部ネットワークに接続。ゲートウェイとして機能
-- **Scanner**: `aegis-net` のみに接続。外部アクセス不要（定義ファイル更新時のみ例外）
+- **Scanner**: `aegis-net` + 外部ネットワークに接続。ClamAV / Trivy の定義ファイル更新に外部アクセスが必要
 
 ## Performance
 

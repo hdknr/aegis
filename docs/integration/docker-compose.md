@@ -16,6 +16,7 @@ services:
     container_name: aegis-scanner
     networks:
       - aegis-net
+      - default  # external access for freshclam/trivy DB updates
     volumes:
       - clamav-db:/var/lib/clamav
       - trivy-db:/root/.cache/trivy
@@ -154,7 +155,7 @@ graph LR
 ```
 
 !!! note
-    `aegis-worker` と `aegis-scanner` は `aegis-net` のみに接続されるため、直接インターネットにアクセスすることはできない。
+    `aegis-worker` は `aegis-net` のみに接続されるため、直接インターネットにアクセスすることはできない。`aegis-scanner` は ClamAV / Trivy の定義ファイル更新のため `default` ネットワークにも接続される。
 
 ## Startup Order
 
