@@ -13,6 +13,12 @@
 | `AEGIS_OUTPUT_FORMAT` | `text` | CLI 出力形式 (`text`, `json`) |
 | `AEGIS_TIMEOUT` | `30` | リクエストタイムアウト (秒) |
 
+### Docker Compose (Host)
+
+| Variable | Default | Description |
+|---|---|---|
+| `AEGIS_WORKSPACE` | `./workspace` | Worker にマウントするホスト側ディレクトリ |
+
 ### aegis-worker
 
 | Variable | Default | Description |

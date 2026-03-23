@@ -117,13 +117,18 @@ aegis fetch --json https://example.com/page.html
 aegis-worker コンテナ内で Claude Code を起動し、全ての操作を隔離環境内で実行する。最も安全だが、ホスト側のファイルは `/workspace` マウント経由でのみアクセス可能。
 
 ```bash
+# 作業対象のプロジェクトを指定して起動
+AEGIS_WORKSPACE=~/Projects/my-app docker compose up -d
+
 # Worker に入る
 docker compose exec aegis-worker /bin/bash
 
 # Worker 内で Claude Code を起動
-# ネットワーク層が Aegis で保護されているため、高い自律性で実行可能
+# /workspace が ~/Projects/my-app にマッピングされている
 claude --dangerously-skip-permissions
 ```
+
+`AEGIS_WORKSPACE` を指定しない場合はデフォルトの `./workspace` ディレクトリがマウントされる。
 
 ### 動作確認
 
