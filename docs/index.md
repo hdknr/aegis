@@ -1,0 +1,35 @@
+# Aegis
+
+**Security-first isolated execution environment and scanning gateway for AI agents.**
+
+## Problem
+
+AI エージェント（Claude Code 等）がソフトウェア開発タスクを実行する際、外部リソースへのアクセスやコマンド実行が必要になる。しかし、これらの操作には以下のリスクが伴う:
+
+- 悪意あるパッケージのダウンロード（サプライチェーン攻撃）
+- 危険なスクリプトの実行（`curl | bash` パターン）
+- 機密情報の外部送信（データ窃取）
+- C2 サーバーへの接続（マルウェア通信）
+
+## Solution
+
+Aegis は **3 層の防御** により、AI エージェントの操作を安全に実行する環境を提供する。
+
+### Aegis Shield (Worker)
+
+プロセス隔離層。Docker コンテナ内で AI エージェントを実行し、ホストシステムを保護する。全ての外部通信はプロキシ経由に制限される。
+
+### Aegis Eye (Proxy)
+
+トラフィック検査層。mitmproxy ベースの HTTP/HTTPS インターセプトプロキシが、全てのリクエスト・レスポンスをリアルタイムで検査し、危険なパターンをブロックする。
+
+### Aegis Blade (Scanner)
+
+深層スキャン層。ClamAV と Trivy を用いた非同期スキャンエンジンが、ダウンロードされたバイナリやスクリプトのマルウェア・脆弱性を検出する。
+
+## Design Principles
+
+- **Defense in Depth**: 単一の防御層に依存しない多層防御
+- **Fail-Closed**: スキャナー障害時はリクエストをブロック（安全側に倒す）
+- **Least Privilege**: Worker コンテナの権限を最小限に制限
+- **Transparency**: 全てのブロック・警告を構造化ログで記録

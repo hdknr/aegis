@@ -1,0 +1,63 @@
+site_name: Aegis Documentation
+site_description: Security-first isolated execution environment for AI agents
+repo_url: https://github.com/hdknr/aegis
+repo_name: hdknr/aegis
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - attr_list
+  - md_in_html
+  - tables
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Getting Started: getting-started.md
+  - Components:
+      - "Aegis Shield (Worker)": components/worker.md
+      - "Aegis Eye (Proxy)": components/proxy.md
+      - "Aegis Blade (Scanner)": components/scanner.md
+  - Security:
+      - Security Policy: security/policy.md
+      - Scan Rules: security/scan-rules.md
+  - Integration:
+      - Docker Compose: integration/docker-compose.md
+      - Inter-Component API: integration/api.md
+  - Reference:
+      - Configuration: reference/configuration.md
