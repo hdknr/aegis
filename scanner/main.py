@@ -1,13 +1,17 @@
 import shutil
 import socket
+import tempfile
 import time
 from itertools import chain
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
-from scanner.config import CLAMAV_DB_PATH, CLAMD_SOCKET, TRIVY_CACHE_DIR
-from scanner.models import ComponentStatus, HealthResponse, OverallStatus
+from scanner.config import CLAMAV_DB_PATH, CLAMD_HOST, CLAMD_PORT, MAX_FILE_SIZE, TRIVY_CACHE_DIR
+from scanner.models import ComponentStatus, HealthResponse, OverallStatus, ScanResponse
+from scanner.scanners import aggregate_verdict
+from scanner.scanners import clamav as clamav_scanner
+from scanner.scanners import trivy as trivy_scanner
 
 app = FastAPI(title="Aegis Blade", description="Security scanning engine")
 
@@ -22,10 +26,9 @@ async def _cache_trivy_check():
 
 def _check_clamd() -> ComponentStatus:
     try:
-        host, port = CLAMD_SOCKET.rsplit(":", 1)
-        with socket.create_connection((host, int(port)), timeout=2):
+        with socket.create_connection((CLAMD_HOST, CLAMD_PORT), timeout=2):
             return ComponentStatus.ready
-    except (ConnectionRefusedError, TimeoutError, OSError, ValueError):
+    except (ConnectionRefusedError, TimeoutError, OSError):
         return ComponentStatus.unavailable
 
 
@@ -72,3 +75,43 @@ def health():
         clamav_db_age_hours=_clamav_db_age_hours(),
         trivy_db_age_hours=_trivy_db_age_hours(),
     )
+
+
+@app.post("/scan", response_model=ScanResponse)
+def scan(
+    file: UploadFile = File(...),
+    content_type: str = Form(...),
+    source_url: str = Form(...),
+    request_id: str = Form(...),
+):
+    # Check file size
+    file.file.seek(0, 2)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File size {size} exceeds limit {MAX_FILE_SIZE}")
+
+    start = time.monotonic()
+    tmp_path = None
+    try:
+        # Write to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".scan") as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = Path(tmp.name)
+
+        # Run scans
+        clamav_verdict, clamav_detail = clamav_scanner.scan(tmp_path)
+        trivy_verdict, trivy_detail = trivy_scanner.scan(tmp_path)
+
+        verdict = aggregate_verdict(clamav_verdict, trivy_verdict)
+        duration = int((time.monotonic() - start) * 1000)
+
+        return ScanResponse(
+            request_id=request_id,
+            verdict=verdict,
+            details=[clamav_detail, trivy_detail],
+            scan_duration_ms=duration,
+        )
+    finally:
+        if tmp_path:
+            tmp_path.unlink(missing_ok=True)
