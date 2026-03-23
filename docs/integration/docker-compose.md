@@ -18,6 +18,7 @@ services:
       - aegis-net
     volumes:
       - clamav-db:/var/lib/clamav
+      - trivy-db:/root/.cache/trivy
     environment:
       AEGIS_SCAN_TIMEOUT: "30000"
       AEGIS_MAX_FILE_SIZE: "52428800"
@@ -119,6 +120,8 @@ networks:
 volumes:
   clamav-db:
     driver: local
+  trivy-db:
+    driver: local
   aegis-certs:
     driver: local
 ```
@@ -164,6 +167,7 @@ graph LR
 | Volume | Mount Point | Purpose |
 |---|---|---|
 | `clamav-db` | `/var/lib/clamav` (scanner) | ClamAV 定義ファイルの永続化 |
+| `trivy-db` | `/root/.cache/trivy` (scanner) | Trivy 脆弱性 DB の永続化 |
 | `aegis-certs` | `/home/mitmproxy/.mitmproxy` (proxy), `/certs` (worker) | mitmproxy CA 証明書の共有 |
 | `${AEGIS_WORKSPACE:-./workspace}` | `/workspace` (worker) | プロジェクトディレクトリのマウント（環境変数で変更可能） |
 | `./rules` | `/opt/aegis/rules` (proxy) | スキャンルール設定ファイル |

