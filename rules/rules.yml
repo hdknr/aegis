@@ -37,6 +37,51 @@ dangerous_patterns:
     severity: high
     description: "Perl reverse shell pattern"
 
+  - name: netcat_reverse_shell
+    pattern: '(nc|ncat|netcat)\s+.*-e\s+/bin/(ba)?sh'
+    severity: critical
+    description: "Netcat reverse shell"
+
+  - name: bash_reverse_shell
+    pattern: 'bash\s+-i\s+>&\s+/dev/tcp/'
+    severity: critical
+    description: "Bash /dev/tcp reverse shell"
+
+  - name: python_reverse_shell
+    pattern: 'python[23]?\s+-c\s+.*socket.*connect'
+    severity: critical
+    description: "Python reverse shell via socket"
+
+  - name: nmap_scan
+    pattern: 'nmap\s+(-[a-zA-Z]+\s+)*[\d\.]+'
+    severity: high
+    description: "Network scanning with nmap"
+
+  - name: docker_socket_access
+    pattern: '/var/run/docker\.sock'
+    severity: critical
+    description: "Docker socket access attempt"
+
+  - name: proc_sys_write
+    pattern: 'echo\s+.*>\s*/proc/'
+    severity: critical
+    description: "Writing to /proc filesystem"
+
+  - name: etc_passwd_shadow
+    pattern: 'cat\s+/etc/(passwd|shadow)'
+    severity: high
+    description: "Reading system credential files"
+
+  - name: crontab_injection
+    pattern: 'crontab\s|/etc/cron'
+    severity: high
+    description: "Crontab modification attempt"
+
+  - name: ssh_key_exfil
+    pattern: 'cat\s+.*\.ssh/(id_rsa|id_ed25519|authorized_keys)'
+    severity: critical
+    description: "SSH key access attempt"
+
 content_type_rules:
   scan_required:
     - "application/x-executable"
