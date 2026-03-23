@@ -6,8 +6,11 @@ from pathlib import Path
 
 from mitmproxy import http
 
+from proxy.content_inspector import check_dangerous_patterns, is_binary_content, is_script_content
 from proxy.rules_loader import load_c2_blocklist, load_domain_whitelist, load_rules
+from proxy.scanner_client import scan_payload
 from proxy.utils import block_flow, generate_request_id
+from scanner.models import Verdict
 
 logger = logging.getLogger("aegis-proxy")
 
@@ -76,6 +79,31 @@ class AegisAddon:
         if self._is_binary_download(flow) and host not in self.domain_whitelist:
             block_flow(flow, "domain_not_whitelisted", request_id)
             return
+
+    def response(self, flow: http.HTTPFlow) -> None:
+        if flow.response is None or flow.response.status_code == 403:
+            return
+
+        request_id = flow.metadata.get("aegis_request_id", generate_request_id())
+        content_type = flow.response.headers.get("content-type", "")
+
+        if is_script_content(content_type):
+            patterns = self.rules.get("dangerous_patterns", [])
+            matched = check_dangerous_patterns(flow.response.content, patterns)
+            if matched:
+                block_flow(flow, "dangerous_script_pattern", request_id, pattern_matched=matched)
+                return
+
+        if is_binary_content(content_type):
+            verdict = scan_payload(
+                flow.response.content, content_type, flow.request.pretty_url, request_id,
+            )
+            if verdict == Verdict.block:
+                block_flow(flow, "scanner_verdict_block", request_id)
+                return
+            if verdict == Verdict.warn:
+                flow.response.headers["X-Aegis-Warning"] = "medium-risk vulnerability detected"
+                flow.response.headers["X-Aegis-Request-Id"] = request_id
 
 
 addons = [AegisAddon()]
