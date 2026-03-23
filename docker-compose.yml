@@ -1,0 +1,107 @@
+services:
+  aegis-scanner:
+    build:
+      context: .
+      dockerfile: scanner/Dockerfile
+    container_name: aegis-scanner
+    networks:
+      - aegis-net
+      - default  # external access for freshclam/trivy DB updates
+    volumes:
+      - clamav-db:/var/lib/clamav
+      - trivy-db:/root/.cache/trivy
+    environment:
+      AEGIS_SCAN_TIMEOUT: "30000"
+      AEGIS_MAX_FILE_SIZE: "52428800"
+      AEGIS_WORKERS: "2"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  aegis-proxy:
+    build:
+      context: .
+      dockerfile: proxy/Dockerfile
+    container_name: aegis-proxy
+    depends_on:
+      aegis-scanner:
+        condition: service_healthy
+    networks:
+      - aegis-net
+      - default
+    ports:
+      - "8081:8081"
+    volumes:
+      - aegis-certs:/root/.mitmproxy
+      - ./rules:/opt/aegis/rules:ro
+    environment:
+      AEGIS_SCANNER_URL: "http://aegis-scanner:8080"
+      AEGIS_RULES_PATH: "/opt/aegis/rules"
+      AEGIS_LOG_LEVEL: "INFO"
+      AEGIS_FAIL_MODE: "closed"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-x", "http://localhost:8080", "http://example.com"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  aegis-worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: aegis-worker
+    depends_on:
+      aegis-proxy:
+        condition: service_healthy
+    networks:
+      - aegis-net
+    volumes:
+      - ${AEGIS_WORKSPACE:-./workspace}:/workspace
+      - aegis-certs:/certs:ro
+    environment:
+      HTTP_PROXY: "http://aegis-proxy:8080"
+      HTTPS_PROXY: "http://aegis-proxy:8080"
+      NO_PROXY: "aegis-scanner,localhost,127.0.0.1"
+      NODE_EXTRA_CA_CERTS: "/certs/mitmproxy-ca-cert.pem"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - SETUID   # required for gosu user switch in entrypoint
+      - SETGID
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+networks:
+  aegis-net:
+    driver: bridge
+    internal: true
+  default:
+    driver: bridge
+
+volumes:
+  clamav-db:
+    driver: local
+  trivy-db:
+    driver: local
+  aegis-certs:
+    driver: local
