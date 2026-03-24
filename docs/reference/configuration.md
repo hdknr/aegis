@@ -38,6 +38,9 @@
 | `AEGIS_LOG_LEVEL` | `INFO` | ログレベル (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `AEGIS_FAIL_MODE` | `closed` | Scanner 障害時の動作 (`closed` = ブロック, `open` = 通過) |
 | `AEGIS_SCAN_TIMEOUT_MS` | `30000` | Scanner API タイムアウト (ms) |
+| `AEGIS_RATE_LIMIT_REQUESTS` | `100` | IP あたりのリクエスト数上限 |
+| `AEGIS_RATE_LIMIT_WINDOW` | `60` | レート制限ウィンドウ (秒) |
+| `AEGIS_MAX_RESPONSE_SIZE` | `52428800` | 最大レスポンスサイズ (bytes, default 50MB) |
 
 ### aegis-scanner
 

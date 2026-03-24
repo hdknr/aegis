@@ -1,7 +1,9 @@
+import collections
 import ipaddress
 import logging
 import os
 import socket
+import time
 from pathlib import Path
 
 from mitmproxy import http
@@ -16,6 +18,11 @@ logger = logging.getLogger("aegis-proxy")
 
 RULES_PATH = Path(os.getenv("AEGIS_RULES_PATH", "/opt/aegis/rules"))
 
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = int(os.getenv("AEGIS_RATE_LIMIT_REQUESTS", "100"))
+RATE_LIMIT_WINDOW = int(os.getenv("AEGIS_RATE_LIMIT_WINDOW", "60"))
+MAX_RESPONSE_SIZE = int(os.getenv("AEGIS_MAX_RESPONSE_SIZE", "52428800"))  # 50MB
+
 _BINARY_EXTENSIONS = (
     ".exe", ".msi", ".deb", ".rpm", ".pkg", ".dmg",
     ".tar.gz", ".tgz", ".tar.bz2", ".zip", ".gz", ".xz",
@@ -28,6 +35,7 @@ class AegisAddon:
         self.domain_whitelist: set[str] = set()
         self.c2_blocklist: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
         self.rules: dict = {}
+        self._request_log: dict[str, collections.deque] = {}
         self._load_rules()
 
     def _load_rules(self):
@@ -67,10 +75,34 @@ class AegisAddon:
         path = flow.request.path.lower()
         return any(path.endswith(ext) for ext in _BINARY_EXTENSIONS)
 
+    def _is_rate_limited(self, client_ip: str) -> bool:
+        now = time.monotonic()
+        timestamps = self._request_log.get(client_ip)
+        if timestamps is None:
+            self._request_log[client_ip] = collections.deque([now])
+            return False
+        cutoff = now - RATE_LIMIT_WINDOW
+        while timestamps and timestamps[0] < cutoff:
+            timestamps.popleft()
+        if not timestamps:
+            del self._request_log[client_ip]
+            self._request_log[client_ip] = collections.deque([now])
+            return False
+        if len(timestamps) >= RATE_LIMIT_REQUESTS:
+            return True
+        timestamps.append(now)
+        return False
+
     def request(self, flow: http.HTTPFlow) -> None:
         request_id = generate_request_id()
         flow.metadata["aegis_request_id"] = request_id
         host = flow.request.pretty_host.lower()
+
+        # Rate limiting
+        client_ip = flow.client_conn.peername[0] if flow.client_conn.peername else "unknown"
+        if self._is_rate_limited(client_ip):
+            block_flow(flow, "rate_limit_exceeded", request_id)
+            return
 
         if self._is_c2_ip(host):
             block_flow(flow, "c2_ip_blocked", request_id)
@@ -85,6 +117,15 @@ class AegisAddon:
             return
 
         request_id = flow.metadata.get("aegis_request_id", generate_request_id())
+
+        content_length = flow.response.headers.get("content-length")
+        if content_length and int(content_length) > MAX_RESPONSE_SIZE:
+            block_flow(flow, "response_too_large", request_id)
+            return
+        if flow.response.content and len(flow.response.content) > MAX_RESPONSE_SIZE:
+            block_flow(flow, "response_too_large", request_id)
+            return
+
         content_type = flow.response.headers.get("content-type", "")
 
         if is_script_content(content_type):

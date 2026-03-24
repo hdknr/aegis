@@ -14,6 +14,7 @@ def make_flow(
     flow.request.pretty_host = host
     flow.request.path = url.split(host, 1)[-1] if host in url else "/"
     flow.request.method = "GET"
+    flow.client_conn.peername = ("127.0.0.1", 12345)
     flow.metadata = {}
 
     if status_code is not None:

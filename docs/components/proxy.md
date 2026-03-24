@@ -39,9 +39,9 @@ graph TB
 
 リクエスト送信前に実行される同期チェック。
 
-1. **Domain whitelist check**: バイナリダウンロード先のドメインがホワイトリストに含まれるか確認
-2. **C2 IP blocklist check**: 接続先 IP が既知の C2 アドレスリストに含まれないか確認
-3. **URL pattern check**: 危険な URL パターン（既知のマルウェア配布サイト等）をチェック
+1. **Rate limiting**: クライアント IP あたりのリクエスト数を制限（デフォルト: 100 req/60s）
+2. **Domain whitelist check**: バイナリダウンロード先のドメインがホワイトリストに含まれるか確認
+3. **C2 IP blocklist check**: 接続先 IP が既知の C2 アドレスリストに含まれないか確認
 
 ブロック時は `403 Forbidden` レスポンスを返し、理由を JSON body で通知する。
 
@@ -49,9 +49,10 @@ graph TB
 
 レスポンス受信後に実行される検査。
 
-1. **Content-Type inspection**: レスポンスの Content-Type を確認
-2. **Script pattern check**: テキストレスポンスに危険なパターン（`curl | bash` 等）が含まれないか検査
-3. **Binary scan delegation**: バイナリ/実行ファイルの場合、`aegis-scanner` に非同期スキャンを委託
+1. **Response size check**: `Content-Length` ヘッダーまたはボディサイズが上限（デフォルト: 50MB）を超えていないか確認
+2. **Content-Type inspection**: レスポンスの Content-Type を確認
+3. **Script pattern check**: テキストレスポンスに危険なパターン（`curl | bash` 等）が含まれないか検査
+4. **Binary scan delegation**: バイナリ/実行ファイルの場合、`aegis-scanner` に非同期スキャンを委託
 
 ```python
 # Pseudo-code for response hook
@@ -162,7 +163,7 @@ docker compose exec aegis-proxy kill -HUP 1
   "action": "rules_reloaded",
   "domain_whitelist_count": 12,
   "c2_blocklist_count": 1543,
-  "dangerous_patterns_count": 7
+  "dangerous_patterns_count": 17
 }
 ```
 

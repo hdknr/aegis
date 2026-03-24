@@ -14,6 +14,11 @@ services:
       AEGIS_SCAN_TIMEOUT: "30000"
       AEGIS_MAX_FILE_SIZE: "52428800"
       AEGIS_WORKERS: "2"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
     deploy:
       resources:
         limits:
@@ -48,6 +53,19 @@ services:
       AEGIS_RULES_PATH: "/opt/aegis/rules"
       AEGIS_LOG_LEVEL: "INFO"
       AEGIS_FAIL_MODE: "closed"
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
     healthcheck:
       test: ["CMD", "curl", "-f", "-x", "http://localhost:8080", "http://example.com"]
       interval: 30s
@@ -74,14 +92,22 @@ services:
       HTTPS_PROXY: "http://aegis-proxy:8080"
       NO_PROXY: "aegis-scanner,localhost,127.0.0.1"
       NODE_EXTRA_CA_CERTS: "/certs/mitmproxy-ca-cert.pem"
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,noexec,nosuid
+      - /run:size=10M
+      - /home/aegis:size=50M
     security_opt:
       - no-new-privileges:true
+      - seccomp=seccomp/worker.json
     cap_drop:
       - ALL
     cap_add:
-      - NET_RAW
       - SETUID   # required for gosu user switch in entrypoint
       - SETGID
+    pids_limit: 128
+    dns:
+      - 127.0.0.11
     deploy:
       resources:
         limits:
