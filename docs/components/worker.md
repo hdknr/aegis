@@ -41,32 +41,68 @@ NO_PROXY=aegis-scanner,localhost,127.0.0.1
 ```yaml
 security_opt:
   - no-new-privileges:true
+  - seccomp=seccomp/worker.json
 cap_drop:
   - ALL
 cap_add:
-  - NET_RAW  # ping 等の基本ネットワーク診断用
+  - SETUID   # gosu user switch 用
+  - SETGID
 ```
 
 - `--privileged` は使用しない
 - 全ケーパビリティをドロップし、必要最小限のみ追加
 - `no-new-privileges` で権限昇格を防止
+- seccomp プロファイルで危険な syscall（mount, ptrace, kernel module 等）をブロック
 
 ### Filesystem
+
+```yaml
+read_only: true
+tmpfs:
+  - /tmp:size=100M,noexec,nosuid
+  - /run:size=10M
+  - /home/aegis:size=50M
+```
 
 | Mount | Type | Mode | Purpose |
 |---|---|---|---|
 | `/workspace` | bind | read-write | プロジェクトディレクトリ |
-| `/usr/local/share/ca-certificates/aegis.crt` | bind | read-only | mitmproxy CA 証明書 |
+| `/certs` | volume | read-only | mitmproxy CA 証明書 |
+| `/tmp` | tmpfs | noexec,nosuid | 一時ファイル（実行不可） |
+| `/run` | tmpfs | - | ランタイムファイル |
+| `/home/aegis` | tmpfs | - | ユーザーホーム |
 
-### Resource Limits
+ルートファイルシステムは `read_only: true` により読み取り専用。書き込みは tmpfs マウントされた領域のみ許可。
+
+### Process & Resource Limits
 
 ```yaml
+pids_limit: 128
+dns:
+  - 127.0.0.11
 deploy:
   resources:
     limits:
       memory: 4G
       cpus: "2.0"
 ```
+
+- `pids_limit: 128` で fork bomb を防止
+- DNS は Docker 内部 DNS のみに制限
+
+### Seccomp Profile
+
+`seccomp/worker.json` で以下の syscall をブロック:
+
+| Category | Blocked Syscalls |
+|---|---|
+| FS マウント | `mount`, `umount2`, `pivot_root`, `sysfs` |
+| カーネルモジュール | `init_module`, `finit_module`, `delete_module` |
+| デバッグ | `ptrace`, `process_vm_readv`, `process_vm_writev` |
+| システム管理 | `reboot`, `swapon`, `swapoff`, `sethostname` |
+| カーネルキーリング | `add_key`, `keyctl`, `request_key` |
+| eBPF | `bpf`, `perf_event_open` |
+| 名前空間操作 | `setns`, `move_mount`, `open_tree` |
 
 ## TLS Configuration
 
