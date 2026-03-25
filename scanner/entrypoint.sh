@@ -4,7 +4,7 @@ set -e
 DB_DIR="/var/lib/clamav"
 if [ ! -f "$DB_DIR/main.cvd" ] && [ ! -f "$DB_DIR/main.cld" ]; then
     echo "ClamAV DB not found, running freshclam..."
-    if ! freshclam --quiet --foreground; then
+    if ! freshclam --quiet; then
         echo "ERROR: freshclam failed and no existing DB available"
         exit 1
     fi
@@ -13,7 +13,7 @@ else
     DB_AGE=$(( $(date +%s) - $(stat -c %Y "$DB_DIR/main.cvd" 2>/dev/null || stat -c %Y "$DB_DIR/main.cld" 2>/dev/null || echo 0) ))
     if [ "$DB_AGE" -gt "$INTERVAL" ]; then
         echo "ClamAV DB is stale ($DB_AGE seconds old), updating..."
-        freshclam --quiet --foreground || echo "Warning: freshclam failed, using existing DB"
+        freshclam --quiet || echo "Warning: freshclam failed, using existing DB"
     fi
 fi
 

@@ -18,6 +18,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - SETUID   # required for freshclam/clamd user switch (initgroups)
+      - SETGID
     deploy:
       resources:
         limits:

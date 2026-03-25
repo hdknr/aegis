@@ -14,8 +14,7 @@ RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/
 
 COPY scanner/clamd.conf /etc/clamav/clamd.conf
 RUN mkdir -p /var/lib/clamav && chown clamav:clamav /var/lib/clamav \
-    && sed -i 's|^DatabaseMirror.*|DatabaseMirror database.clamav.net|' /etc/clamav/freshclam.conf || true \
-    && sed -i 's|^DatabaseOwner.*|DatabaseOwner root|' /etc/clamav/freshclam.conf
+    && sed -i 's|^DatabaseMirror.*|DatabaseMirror database.clamav.net|' /etc/clamav/freshclam.conf || true
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY scanner/requirements.txt /tmp/requirements.txt
