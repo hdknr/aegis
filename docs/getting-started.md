@@ -21,14 +21,22 @@ cd aegis
 ### 2. Start the Environment
 
 ```bash
-docker compose up -d
+make up
 ```
+
+`make up` は全サービスを起動した後、自動でスモークテストを実行する。スモークテストでは Scanner のヘルスチェック、Worker の稼働確認、実際の URL フェッチによるパイプライン全体の動作確認が行われる。
 
 初回起動時は ClamAV の定義ファイルダウンロードに数分かかる。起動状況を確認:
 
 ```bash
 docker compose ps
 docker compose logs -f aegis-scanner  # ClamAV 初期化の進捗
+```
+
+スモークテストだけを再実行したい場合:
+
+```bash
+make smoke
 ```
 
 全サービスが `healthy` になるまで待機:
