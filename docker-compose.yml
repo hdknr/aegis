@@ -18,12 +18,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    pids_limit: 64
     deploy:
       resources:
         limits:
           memory: 2G
           cpus: "1.0"
+          pids: 64
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -60,12 +60,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    pids_limit: 64
     deploy:
       resources:
         limits:
           memory: 1G
           cpus: "1.0"
+          pids: 64
     healthcheck:
       test: ["CMD", "curl", "-f", "-x", "http://localhost:8080", "http://example.com"]
       interval: 30s
@@ -105,7 +105,6 @@ services:
     cap_add:
       - SETUID   # required for gosu user switch in entrypoint
       - SETGID
-    pids_limit: 128
     dns:
       - 127.0.0.11
     deploy:
@@ -113,6 +112,7 @@ services:
         limits:
           memory: 4G
           cpus: "2.0"
+          pids: 128
     stdin_open: true
     tty: true
     restart: unless-stopped
