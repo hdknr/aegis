@@ -95,6 +95,9 @@ services:
       HTTPS_PROXY: "http://aegis-proxy:8080"
       NO_PROXY: "aegis-scanner,localhost,127.0.0.1"
       NODE_EXTRA_CA_CERTS: "/certs/mitmproxy-ca-cert.pem"
+      SSL_CERT_FILE: "/tmp/ca-bundle.crt"
+      REQUESTS_CA_BUNDLE: "/tmp/ca-bundle.crt"
+      CURL_CA_BUNDLE: "/tmp/ca-bundle.crt"
     read_only: true
     tmpfs:
       - /tmp:size=100M,noexec,nosuid
