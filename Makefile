@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-e2e build up down docs
+.PHONY: test test-unit test-e2e smoke build up down docs
 
 test: test-unit
 
@@ -11,8 +11,14 @@ test-e2e:
 build:
 	docker compose build
 
+smoke:
+	./scripts/smoke-test.sh
+
 up:
 	docker compose up -d
+	@echo ""
+	@echo "Running smoke test..."
+	@./scripts/smoke-test.sh
 
 down:
 	docker compose down -v
