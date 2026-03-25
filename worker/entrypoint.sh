@@ -2,12 +2,12 @@
 set -e
 
 CERT_SRC="/certs/mitmproxy-ca-cert.pem"
-CERT_DST="/usr/local/share/ca-certificates/aegis.crt"
 
 if [ -f "$CERT_SRC" ]; then
-    cp "$CERT_SRC" "$CERT_DST"
-    update-ca-certificates --fresh > /dev/null 2>&1
+    # System CA store is read-only; configure per-runtime CA trust instead
     export NODE_EXTRA_CA_CERTS="$CERT_SRC"
+    export SSL_CERT_FILE="$CERT_SRC"
+    export REQUESTS_CA_BUNDLE="$CERT_SRC"
 fi
 
 exec gosu aegis "$@"
