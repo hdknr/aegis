@@ -82,6 +82,67 @@ dangerous_patterns:
     severity: critical
     description: "SSH key access attempt"
 
+  # --- JavaScript-specific patterns ---
+
+  # Obfuscation / dynamic code execution
+  - name: js_eval_atob
+    pattern: 'eval\s*\(\s*atob\s*\('
+    severity: critical
+    description: "Base64 decode and eval — common JS malware pattern"
+
+  - name: js_eval_fromcharcode
+    pattern: 'eval\s*\(\s*String\s*\.\s*fromCharCode'
+    severity: critical
+    description: "Char-code based eval — obfuscated code execution"
+
+  - name: js_function_constructor
+    pattern: 'new\s+Function\s*\([^)]*\+[^)]*\)'
+    severity: high
+    description: "Function constructor with concatenation — dynamic code generation"
+
+  - name: js_document_write_unescape
+    pattern: 'document\s*\.\s*write\s*\(\s*unescape\s*\('
+    severity: high
+    description: "document.write with unescape — obfuscated HTML/JS injection"
+
+  # Data exfiltration
+  - name: js_cookie_exfil_fetch
+    pattern: 'document\s*\.\s*cookie.*fetch\s*\(|fetch\s*\(.*document\s*\.\s*cookie'
+    severity: critical
+    description: "Cookie exfiltration via fetch"
+
+  - name: js_cookie_exfil_xhr
+    pattern: 'document\s*\.\s*cookie.*XMLHttpRequest|XMLHttpRequest.*document\s*\.\s*cookie'
+    severity: critical
+    description: "Cookie exfiltration via XMLHttpRequest"
+
+  - name: js_cookie_exfil_img
+    pattern: 'new\s+Image\s*\(\s*\)[\s\S]{0,80}document\s*\.\s*cookie'
+    severity: critical
+    description: "Cookie exfiltration via Image pixel"
+
+  - name: js_storage_exfil
+    pattern: '(localStorage|sessionStorage)\s*\.\s*getItem.*fetch\s*\(|fetch\s*\(.*(localStorage|sessionStorage)\s*\.\s*getItem'
+    severity: high
+    description: "Storage data exfiltration via fetch"
+
+  # Dynamic script loading
+  - name: js_dynamic_script_src
+    pattern: 'createElement\s*\(\s*[''"]script[''"]\s*\)[\s\S]{0,120}\.src\s*='
+    severity: medium
+    description: "Dynamic script element creation with external source"
+
+  # C2 / beacon patterns
+  - name: js_websocket_eval
+    pattern: 'WebSocket[\s\S]{0,200}eval\s*\(|eval\s*\([\s\S]{0,200}WebSocket'
+    severity: critical
+    description: "WebSocket combined with eval — C2 communication pattern"
+
+  - name: js_beacon_interval
+    pattern: 'setInterval\s*\(\s*function[\s\S]{0,200}fetch\s*\(\s*[''"]https?://'
+    severity: high
+    description: "Periodic fetch beacon — potential C2 heartbeat"
+
 content_type_rules:
   scan_required:
     - "application/x-executable"
