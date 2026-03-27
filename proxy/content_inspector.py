@@ -7,6 +7,8 @@ _SCRIPT_TYPES = frozenset({
     "text/x-ruby",
     "application/x-sh",
     "application/x-csh",
+    "text/javascript",
+    "application/javascript",
 })
 
 _BINARY_TYPES = frozenset({
@@ -27,7 +29,6 @@ _PASS_THROUGH_EXACT = frozenset({
     "text/html",
     "text/plain",
     "text/css",
-    "text/javascript",
     "application/json",
     "application/xml",
 })
