@@ -43,10 +43,16 @@ def compose_ps() -> str:
 
 
 def exec_in_worker(command: list[str], timeout: int | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
+    result = subprocess.run(
         _compose_cmd("exec", "-T", "aegis-worker", *command),
-        capture_output=True, text=True,
+        capture_output=True,
         timeout=timeout or TIMEOUT,
+    )
+    return subprocess.CompletedProcess(
+        args=result.args,
+        returncode=result.returncode,
+        stdout=result.stdout.decode("utf-8", errors="replace"),
+        stderr=result.stderr.decode("utf-8", errors="replace"),
     )
 
 
