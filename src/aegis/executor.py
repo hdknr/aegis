@@ -54,7 +54,7 @@ def fetch_url(url: str, timeout: int | None = None) -> dict:
     """Fetch a URL through aegis-worker and return structured result."""
     # Use a unique separator to avoid ambiguity with body content
     result = exec_in_worker(
-        ["curl", "-s",
+        ["curl", "-sL",
          "-w", f"{_SEPARATOR}%{{http_code}}{_SEPARATOR}%{{content_type}}",
          "-D", "/dev/stderr", "-o", "-", url],
         timeout=timeout,
